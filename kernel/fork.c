@@ -77,6 +77,7 @@
 #include <linux/aio.h>
 #include <linux/compiler.h>
 #include <linux/sysctl.h>
+#include <linux/cpufreq.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
