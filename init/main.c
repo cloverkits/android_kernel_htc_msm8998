@@ -88,10 +88,6 @@
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
 
-#ifdef CONFIG_HTC_EARLY_RTB
-#include <linux/msm_rtb.h>
-#endif
-
 static int kernel_init(void *);
 
 extern void init_IRQ(void);
@@ -788,18 +784,10 @@ int __init_or_module do_one_initcall(initcall_t fn)
 	if (initcall_blacklisted(fn))
 		return -EPERM;
 
-#ifdef CONFIG_HTC_EARLY_RTB
-	uncached_logk_pc(LOGK_INITCALL, (void *)fn, (void *)(0x00000000));
-#endif
-
 	if (initcall_debug)
 		ret = do_one_initcall_debug(fn);
 	else
 		ret = fn();
-
-#ifdef CONFIG_HTC_EARLY_RTB
-	uncached_logk_pc(LOGK_INITCALL, (void *)fn, (void *)(0xffffffff));
-#endif
 
 	msgbuf[0] = 0;
 
@@ -1031,9 +1019,7 @@ static noinline void __init kernel_init_freeable(void)
 	lockup_detector_init();
 
 	smp_init();
-#ifdef CONFIG_HTC_EARLY_RTB
-	htc_early_rtb_init();
-#endif
+
 	sched_init_smp();
 
 	page_alloc_init_late();

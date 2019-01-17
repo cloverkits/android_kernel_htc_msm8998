@@ -25,12 +25,7 @@ DEFINE_MUTEX(pm_mutex);
 /* Routines for PM-transition notifications */
 
 static BLOCKING_NOTIFIER_HEAD(pm_chain_head);
-#ifdef CONFIG_HTC_POWER_DEBUG
-struct blocking_notifier_head *get_pm_chain_head(void)
-{
-	return &pm_chain_head;
-}
-#endif
+
 int register_pm_notifier(struct notifier_block *nb)
 {
 	return blocking_notifier_chain_register(&pm_chain_head, nb);
@@ -374,15 +369,7 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	state = decode_state(buf, n);
 	if (state < PM_SUSPEND_MAX)
-#ifdef CONFIG_HTC_POWER_DEBUG
-	{
-		pr_info("[R] suspend start\n");
-#endif
 		error = pm_suspend(state);
-#ifdef CONFIG_HTC_POWER_DEBUG
-		pr_info("[R] resume end\n");
-	}
-#endif
 	else if (state == PM_SUSPEND_MAX)
 		error = hibernate();
 	else
