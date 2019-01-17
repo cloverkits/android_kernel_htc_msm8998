@@ -1019,7 +1019,6 @@ static noinline void __init kernel_init_freeable(void)
 	lockup_detector_init();
 
 	smp_init();
-
 	sched_init_smp();
 
 	page_alloc_init_late();

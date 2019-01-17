@@ -524,7 +524,6 @@ overflow:
 	if (printk_ratelimit())
 		pr_warn("vmap allocation for size %lu failed: "
 			"use vmalloc=<size> to increase size.\n", size);
-
 	kfree(va);
 	return ERR_PTR(-EBUSY);
 }

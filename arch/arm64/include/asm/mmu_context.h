@@ -41,6 +41,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
 	:
 	: "r" (pid));
 	uncached_logk(LOGK_CTXID, (void *)(u64)pid);
+
 }
 #else
 static inline void contextidr_thread_switch(struct task_struct *next)

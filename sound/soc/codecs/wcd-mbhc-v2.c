@@ -594,6 +594,7 @@ static void wcd_mbhc_set_and_turnoff_hph_padac(struct wcd_mbhc *mbhc)
 	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HPH_PA_EN, 0);
 	usleep_range(wg_time * 1000, wg_time * 1000 + 50);
 
+
 	if (mbhc->mbhc_cb->is_anc_on && mbhc->mbhc_cb->is_anc_on(mbhc)) {
 		usleep_range(20000, 20100);
 		pr_debug("%s ANC is on, setting ANC_OFF_ACK\n", __func__);
