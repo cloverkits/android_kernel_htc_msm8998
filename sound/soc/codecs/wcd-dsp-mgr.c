@@ -426,7 +426,6 @@ static int wdsp_download_segments(struct wdsp_mgr_priv *wdsp,
 
 	/* Notify all components that image is downloaded */
 	wdsp_broadcast_event_downseq(wdsp, post, NULL);
-
 done:
 	return ret;
 

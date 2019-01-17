@@ -996,6 +996,8 @@ struct mdss_overlay_private {
 
 	u8 secure_transition_state;
 
+	bool cache_null_commit; /* Cache if preceding commit was NULL */
+
 	/* HTC ADD*/
 	void *splash_mem_vaddr;
 	dma_addr_t splash_mem_dma;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -33,6 +33,8 @@
 #define SDE_HDCP_DEBUG(fmt, args...)   SDE_DEBUG(fmt, ##args)
 #endif
 
+#define SDE_HDCP_SRM_FAIL 29
+
 enum sde_hdcp_client_id {
 	HDCP_CLIENT_HDMI,
 	HDCP_CLIENT_DP,
@@ -43,6 +45,7 @@ enum sde_hdcp_states {
 	HDCP_STATE_AUTHENTICATING,
 	HDCP_STATE_AUTHENTICATED,
 	HDCP_STATE_AUTH_FAIL,
+	HDCP_STATE_AUTH_FAIL_NOREAUTH,
 	HDCP_STATE_AUTH_ENC_NONE,
 	HDCP_STATE_AUTH_ENC_1X,
 	HDCP_STATE_AUTH_ENC_2P2
@@ -56,6 +59,7 @@ struct sde_hdcp_init_data {
 	struct workqueue_struct *workq;
 	void *cb_data;
 	void (*notify_status)(void *cb_data, enum sde_hdcp_states status);
+	void (*avmute_sink)(void *cb_data);
 	struct sde_hdmi_tx_ddc_ctrl *ddc_ctrl;
 	u8 sink_rx_status;
 	u16 *version;

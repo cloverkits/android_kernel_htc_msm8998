@@ -1267,15 +1267,18 @@ static int ath10k_start_cac(struct ath10k *ar)
 
 	set_bit(ATH10K_CAC_RUNNING, &ar->dev_flags);
 
-	ret = ath10k_monitor_recalc(ar);
-	if (ret) {
-		ath10k_warn(ar, "failed to start monitor (cac): %d\n", ret);
-		clear_bit(ATH10K_CAC_RUNNING, &ar->dev_flags);
-		return ret;
-	}
+	if (!QCA_REV_WCN3990(ar)) {
+		ret = ath10k_monitor_recalc(ar);
+		if (ret) {
+			ath10k_warn(ar, "failed to start monitor (cac): %d\n",
+				    ret);
+			clear_bit(ATH10K_CAC_RUNNING, &ar->dev_flags);
+			return ret;
+		}
 
-	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac cac start monitor vdev %d\n",
-		   ar->monitor_vdev_id);
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac cac start monitor vdev %d\n",
+			   ar->monitor_vdev_id);
+	}
 
 	return 0;
 }
@@ -1289,7 +1292,8 @@ static int ath10k_stop_cac(struct ath10k *ar)
 		return 0;
 
 	clear_bit(ATH10K_CAC_RUNNING, &ar->dev_flags);
-	ath10k_monitor_stop(ar);
+	if (!QCA_REV_WCN3990(ar))
+		ath10k_monitor_stop(ar);
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac cac finished\n");
 
@@ -1386,6 +1390,10 @@ static int ath10k_vdev_start_restart(struct ath10k_vif *arvif,
 	int ret = 0;
 
 	lockdep_assert_held(&ar->conf_mutex);
+
+	/* Clear arp and ns offload cache */
+	memset(&arvif->arp_offload, 0, sizeof(arvif->arp_offload));
+	memset(&arvif->ns_offload, 0, sizeof(arvif->ns_offload));
 
 	reinit_completion(&ar->vdev_setup_done);
 	reinit_completion(&ar->vdev_delete_done);
@@ -3696,6 +3704,7 @@ void ath10k_mgmt_over_wmi_tx_work(struct work_struct *work)
 {
 	struct ath10k *ar = container_of(work, struct ath10k, wmi_mgmt_tx_work);
 	struct sk_buff *skb;
+	dma_addr_t paddr;
 	int ret;
 
 	for (;;) {
@@ -3703,11 +3712,26 @@ void ath10k_mgmt_over_wmi_tx_work(struct work_struct *work)
 		if (!skb)
 			break;
 
-		ret = ath10k_wmi_mgmt_tx(ar, skb);
-		if (ret) {
-			ath10k_warn(ar, "failed to transmit management frame via WMI: %d\n",
-				    ret);
-			ieee80211_free_txskb(ar->hw, skb);
+		if (QCA_REV_WCN3990(ar)) {
+			paddr = dma_map_single(ar->dev, skb->data,
+					       skb->len, DMA_TO_DEVICE);
+			if (!paddr)
+				continue;
+			ret = ath10k_wmi_mgmt_tx_send(ar, skb, paddr);
+			if (ret) {
+				ath10k_warn(ar, "failed to transmit management frame by ref via WMI: %d\n",
+					    ret);
+				dma_unmap_single(ar->dev, paddr, skb->len,
+						 DMA_FROM_DEVICE);
+				ieee80211_free_txskb(ar->hw, skb);
+			}
+		} else {
+			ret = ath10k_wmi_mgmt_tx(ar, skb);
+			if (ret) {
+				ath10k_warn(ar, "failed to transmit management frame via WMI: %d\n",
+					    ret);
+				ieee80211_free_txskb(ar->hw, skb);
+			}
 		}
 	}
 }
@@ -4507,6 +4531,13 @@ static int ath10k_start(struct ieee80211_hw *hw)
 		goto err_core_stop;
 	}
 
+	param = ar->wmi.pdev_param->idle_ps_config;
+	ret = ath10k_wmi_pdev_set_param(ar, param, 1);
+	if (ret) {
+		ath10k_warn(ar, "failed to enable idle_ps_config: %d\n", ret);
+		goto err_core_stop;
+	}
+
 	if (test_bit(WMI_SERVICE_ADAPTIVE_OCS, ar->wmi.svc_map)) {
 		ret = ath10k_wmi_adaptive_qcs(ar, true);
 		if (ret) {
@@ -4947,6 +4978,15 @@ static int ath10k_add_interface(struct ieee80211_hw *hw,
 		goto err;
 	}
 
+	if ((arvif->vdev_type == WMI_VDEV_TYPE_STA) && QCA_REV_WCN3990(ar)) {
+		ret = ath10k_wmi_csa_offload(ar, arvif->vdev_id, true);
+		if (ret) {
+			ath10k_err(ar, "CSA offload failed for vdev %i: %d\n",
+				   arvif->vdev_id, ret);
+			goto err_vdev_delete;
+		}
+	}
+
 	ar->free_vdev_map &= ~(1LL << arvif->vdev_id);
 	list_add(&arvif->list, &ar->arvifs);
 
@@ -5158,6 +5198,9 @@ static void ath10k_remove_interface(struct ieee80211_hw *hw,
 
 		kfree(arvif->u.ap.noa_data);
 	}
+
+	if ((arvif->vdev_type == WMI_VDEV_TYPE_STA) && QCA_REV_WCN3990(ar))
+		ath10k_wmi_csa_offload(ar, arvif->vdev_id, false);
 
 	ath10k_dbg(ar, ATH10K_DBG_MAC, "mac vdev %i delete (remove interface)\n",
 		   arvif->vdev_id);
@@ -5472,7 +5515,8 @@ static int ath10k_hw_scan(struct ieee80211_hw *hw,
 	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
 	struct cfg80211_scan_request *req = &hw_req->req;
 	struct wmi_start_scan_arg arg;
-	int ret = 0;
+	const u8 *ptr;
+	int ret = 0, ie_skip_len = 0;
 	int i;
 
 	mutex_lock(&ar->conf_mutex);
@@ -5504,8 +5548,16 @@ static int ath10k_hw_scan(struct ieee80211_hw *hw,
 	arg.scan_id = ATH10K_SCAN_ID;
 
 	if (req->ie_len) {
-		arg.ie_len = req->ie_len;
-		memcpy(arg.ie, req->ie, arg.ie_len);
+		if (QCA_REV_WCN3990(ar)) {
+			ptr = req->ie;
+			while (ptr[0] == WLAN_EID_SUPP_RATES ||
+			       ptr[0] == WLAN_EID_EXT_SUPP_RATES) {
+				ie_skip_len = ptr[1] + 2;
+				ptr += ie_skip_len;
+			}
+		}
+		arg.ie_len = req->ie_len - ie_skip_len;
+		memcpy(arg.ie, req->ie + ie_skip_len, arg.ie_len);
 	}
 
 	if (req->n_ssids) {
@@ -5513,6 +5565,11 @@ static int ath10k_hw_scan(struct ieee80211_hw *hw,
 		for (i = 0; i < arg.n_ssids; i++) {
 			arg.ssids[i].len  = req->ssids[i].ssid_len;
 			arg.ssids[i].ssid = req->ssids[i].ssid;
+		}
+		if (QCA_REV_WCN3990(ar)) {
+			arg.scan_ctrl_flags &=
+					~(WMI_SCAN_ADD_BCAST_PROBE_REQ |
+					  WMI_SCAN_CHAN_STAT_EVENT);
 		}
 	} else {
 		arg.scan_ctrl_flags |= WMI_SCAN_FLAG_PASSIVE;
@@ -5594,6 +5651,22 @@ static void ath10k_set_key_h_def_keyidx(struct ath10k *ar,
 	if (ret)
 		ath10k_warn(ar, "failed to set vdev %i group key as default key: %d\n",
 			    arvif->vdev_id, ret);
+}
+
+static void ath10k_set_rekey_data(struct ieee80211_hw *hw,
+				  struct ieee80211_vif *vif,
+				  struct cfg80211_gtk_rekey_data *data)
+{
+	struct ath10k *ar = hw->priv;
+	struct ath10k_vif *arvif = ath10k_vif_to_arvif(vif);
+
+	mutex_lock(&ar->conf_mutex);
+	memcpy(&arvif->gtk_rekey_data.kek, data->kek, NL80211_KEK_LEN);
+	memcpy(&arvif->gtk_rekey_data.kck, data->kck, NL80211_KCK_LEN);
+	arvif->gtk_rekey_data.replay_ctr =
+			be64_to_cpup((__be64 *)data->replay_ctr);
+	arvif->gtk_rekey_data.valid = true;
+	mutex_unlock(&ar->conf_mutex);
 }
 
 static int ath10k_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
@@ -6412,7 +6485,13 @@ static int ath10k_remain_on_channel(struct ieee80211_hw *hw,
 	arg.dwell_time_passive = scan_time_msec;
 	arg.max_scan_time = scan_time_msec;
 	arg.scan_ctrl_flags |= WMI_SCAN_FLAG_PASSIVE;
-	arg.scan_ctrl_flags |= WMI_SCAN_FILTER_PROBE_REQ;
+	if (QCA_REV_WCN3990(ar)) {
+		arg.scan_ctrl_flags &= ~(WMI_SCAN_FILTER_PROBE_REQ |
+					  WMI_SCAN_CHAN_STAT_EVENT |
+					  WMI_SCAN_ADD_BCAST_PROBE_REQ);
+	} else {
+		arg.scan_ctrl_flags |= WMI_SCAN_FILTER_PROBE_REQ;
+	}
 	arg.burst_duration_ms = duration;
 
 	ret = ath10k_start_scan(ar, &arg);
@@ -7517,6 +7596,7 @@ static const struct ieee80211_ops ath10k_ops = {
 	.bss_info_changed		= ath10k_bss_info_changed,
 	.hw_scan			= ath10k_hw_scan,
 	.cancel_hw_scan			= ath10k_cancel_hw_scan,
+	.set_rekey_data			= ath10k_set_rekey_data,
 	.set_key			= ath10k_set_key,
 	.set_default_unicast_key        = ath10k_set_default_unicast_key,
 	.sta_state			= ath10k_sta_state,
@@ -7551,6 +7631,7 @@ static const struct ieee80211_ops ath10k_ops = {
 #ifdef CONFIG_PM
 	.suspend			= ath10k_wow_op_suspend,
 	.resume				= ath10k_wow_op_resume,
+	.set_wakeup			= ath10k_wow_op_set_wakeup,
 #endif
 #ifdef CONFIG_MAC80211_DEBUGFS
 	.sta_add_debugfs		= ath10k_sta_add_debugfs,
@@ -7860,6 +7941,12 @@ static struct ieee80211_iface_combination ath10k_wcn3990_qcs_if_comb[] = {
 		.num_different_channels = 1,
 		.max_interfaces = 4,
 		.n_limits = ARRAY_SIZE(ath10k_wcn3990_if_limit),
+#ifdef CONFIG_ATH10K_DFS_CERTIFIED
+		.radar_detect_widths =  BIT(NL80211_CHAN_WIDTH_20_NOHT) |
+				       BIT(NL80211_CHAN_WIDTH_20) |
+				       BIT(NL80211_CHAN_WIDTH_40) |
+				       BIT(NL80211_CHAN_WIDTH_80),
+#endif
 	},
 	{
 		.limits = ath10k_wcn3990_qcs_if_limit,
@@ -7872,6 +7959,12 @@ static struct ieee80211_iface_combination ath10k_wcn3990_qcs_if_comb[] = {
 		.num_different_channels = 1,
 		.max_interfaces = 2,
 		.n_limits = ARRAY_SIZE(ath10k_wcn3990_if_limit_ibss),
+#ifdef CONFIG_ATH10K_DFS_CERTIFIED
+		.radar_detect_widths =  BIT(NL80211_CHAN_WIDTH_20_NOHT) |
+				       BIT(NL80211_CHAN_WIDTH_20) |
+				       BIT(NL80211_CHAN_WIDTH_40) |
+				       BIT(NL80211_CHAN_WIDTH_80),
+#endif
 	},
 };
 
@@ -8212,6 +8305,7 @@ err_free:
 
 void ath10k_mac_unregister(struct ath10k *ar)
 {
+	ath10k_wow_deinit(ar);
 	ieee80211_unregister_hw(ar->hw);
 
 	if (IS_ENABLED(CONFIG_ATH10K_DFS_CERTIFIED) && ar->dfs_detector)

@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -131,7 +131,7 @@ void diag_md_close_all()
 
 int diag_md_write(int id, unsigned char *buf, int len, int ctx)
 {
-	int i;
+	int i, pid = 0;
 	uint8_t found = 0;
 	unsigned long flags;
 	struct diag_md_info *ch = NULL;
@@ -149,21 +149,27 @@ int diag_md_write(int id, unsigned char *buf, int len, int ctx)
 	if (peripheral < 0)
 		return -EINVAL;
 
-	session_info =
-		diag_md_session_get_peripheral(peripheral);
-	if (!session_info)
+	mutex_lock(&driver->md_session_lock);
+	session_info = diag_md_session_get_peripheral(peripheral);
+	if (!session_info) {
+		mutex_unlock(&driver->md_session_lock);
 		return -EIO;
+	}
+	pid = session_info->pid;
+	mutex_unlock(&driver->md_session_lock);
 
 	ch = &diag_md[id];
+	if (!ch)
+		return -EINVAL;
 
 	spin_lock_irqsave(&ch->lock, flags);
 	for (i = 0; i < ch->num_tbl_entries && !found; i++) {
 		if (ch->tbl[i].buf != buf)
 			continue;
 		found = 1;
-		pr_err_ratelimited("diag: trying to write the same buffer buf: %pK, len: %d, back to the table for p: %d, t: %d, so flushing the table entry, proc: %d\n",
+		pr_err_ratelimited("diag: trying to write the same buffer buf: %pK, len: %d, back to the table for p: %d, t: %d, buf_num: %d, proc: %d, i: %d\n",
 				   buf, ch->tbl[i].len, GET_BUF_PERIPHERAL(ctx),
-				   GET_BUF_TYPE(ctx), id);
+				   GET_BUF_TYPE(ctx), GET_BUF_NUM(ctx), id, i);
 		ch->tbl[i].buf = NULL;
 		ch->tbl[i].len = 0;
 		ch->tbl[i].ctx = 0;
@@ -192,17 +198,21 @@ int diag_md_write(int id, unsigned char *buf, int len, int ctx)
 	}
 
 	found = 0;
+	mutex_lock(&driver->diagchar_mutex);
 	for (i = 0; i < driver->num_clients && !found; i++) {
-		if ((driver->client_map[i].pid !=
-		     session_info->pid) ||
+		if ((driver->client_map[i].pid != pid) ||
 		    (driver->client_map[i].pid == 0))
 			continue;
 
 		found = 1;
-		driver->data_ready[i] |= USERMODE_DIAGFWD;
-		DIAG_DBUG("diag: wake up logging process\n");
+		if (!(driver->data_ready[i] & USERMODE_DIAGFWD)) {
+			driver->data_ready[i] |= USERMODE_DIAGFWD;
+			atomic_inc(&driver->data_ready_notif[i]);
+		}
+		pr_debug("diag: wake up logging process\n");
 		wake_up_interruptible(&driver->wait_q);
 	}
+	mutex_unlock(&driver->diagchar_mutex);
 
 	if (!found)
 		return -EINVAL;

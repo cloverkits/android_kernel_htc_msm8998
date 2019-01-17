@@ -71,6 +71,7 @@ enum print_reason {
 #define OTG_DELAY_VOTER			"OTG_DELAY_VOTER"
 #define USBIN_I_VOTER			"USBIN_I_VOTER"
 #define WEAK_CHARGER_VOTER		"WEAK_CHARGER_VOTER"
+#define OV_VOTER			"OV_VOTER"
 
 #ifdef CONFIG_HTC_USB
 #define VCONN_MAX_ATTEMPTS	30
@@ -96,6 +97,7 @@ enum {
 #ifdef CONFIG_HTC_BATT
 	EXT_OTG_HEADSET_WA		= BIT(10),
 #endif
+	OV_IRQ_WA_BIT			= BIT(5),
 };
 
 enum smb_irq_index {

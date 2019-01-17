@@ -162,7 +162,6 @@ static int32_t msm_ois_write_settings(struct msm_ois_ctrl_t *o_ctrl,
 	uint8_t read_data[4] = {0};
 	#endif
 	//HTC_END, OIS
-
 	struct msm_camera_i2c_seq_reg_array *reg_setting;
 	CDBG("Enter\n");
 
@@ -263,6 +262,7 @@ static int32_t msm_ois_write_settings(struct msm_ois_ctrl_t *o_ctrl,
 		if (rc < 0)
 			break;
 	}
+
 	CDBG("Exit\n");
 	return rc;
 }
@@ -419,7 +419,6 @@ static int32_t msm_ois_control(struct msm_ois_ctrl_t *o_ctrl,
 		rc = msm_ois_write_settings(o_ctrl,
 			set_info->ois_params.setting_size,
 			settings);
-
 		kfree(settings);
 		if (rc < 0) {
 			pr_err("Error\n");
@@ -431,6 +430,7 @@ static int32_t msm_ois_control(struct msm_ois_ctrl_t *o_ctrl,
 
 	return rc;
 }
+
 
 static int32_t msm_ois_config(struct msm_ois_ctrl_t *o_ctrl,
 	void __user *argp)

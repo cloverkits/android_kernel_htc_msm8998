@@ -706,10 +706,11 @@ out:
 }
 EXPORT_SYMBOL(mmc_clk_update_freq);
 
-void mmc_recovery_fallback_lower_speed(struct mmc_host *host)
+int mmc_recovery_fallback_lower_speed(struct mmc_host *host)
 {
+	int err = 0;
 	if (!host->card)
-		return;
+		return -EINVAL;
 
 	if (host->sdr104_wa && mmc_card_sd(host->card) &&
 	    (host->ios.timing == MMC_TIMING_UHS_SDR104) &&
@@ -717,9 +718,17 @@ void mmc_recovery_fallback_lower_speed(struct mmc_host *host)
 		pr_err("%s: %s: blocked SDR104, lower the bus-speed (SDR50 / DDR50)\n",
 			mmc_hostname(host), __func__);
 		mmc_host_clear_sdr104(host);
-		mmc_hw_reset(host);
+		err = mmc_hw_reset(host);
 		host->card->sdr104_blocked = true;
+	} else {
+		/* If sdr104_wa is not present, just return status */
+		err = host->bus_ops->alive(host);
 	}
+	if (err)
+		pr_err("%s: %s: Fallback to lower speed mode failed with err=%d\n",
+			mmc_hostname(host), __func__, err);
+
+	return err;
 }
 
 static int mmc_devfreq_set_target(struct device *dev,
@@ -793,7 +802,7 @@ static int mmc_devfreq_set_target(struct device *dev,
 	if (err && err != -EAGAIN) {
 		pr_err("%s: clock scale to %lu failed with error %d\n",
 			mmc_hostname(host), *freq, err);
-		mmc_recovery_fallback_lower_speed(host);
+		err = mmc_recovery_fallback_lower_speed(host);
 	} else {
 		pr_debug("%s: clock change to %lu finished successfully (%s)\n",
 			mmc_hostname(host), *freq, current->comm);
@@ -1449,9 +1458,10 @@ static int mmc_start_cmdq_request(struct mmc_host *host,
 	}
 
 	mmc_host_clk_hold(host);
-	if (likely(host->cmdq_ops->request))
+
+	if (likely(host->cmdq_ops->request)) {
 		ret = host->cmdq_ops->request(host, mrq);
-	else {
+	} else {
 		ret = -ENOENT;
 		pr_err("%s: %s: cmdq request host op is not available\n",
 			mmc_hostname(host), __func__);
@@ -3239,8 +3249,16 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
 	 */
 	mmc_host_clk_hold(host);
 	err = mmc_wait_for_cmd(host, &cmd, 0);
-	if (err)
-		goto err_command;
+	if (err) {
+		if (err == -ETIMEDOUT) {
+			pr_debug("%s: voltage switching failed with err %d\n",
+				mmc_hostname(host), err);
+			err = -EAGAIN;
+			goto power_cycle;
+		} else {
+			goto err_command;
+		}
+	}
 
 	if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR)) {
 		err = -EIO;
@@ -4421,8 +4439,7 @@ int _mmc_detect_card_removed(struct mmc_host *host)
 
 	if (ret) {
 		if (host->ops->get_cd && host->ops->get_cd(host)) {
-			mmc_recovery_fallback_lower_speed(host);
-			ret = 0;
+			ret = mmc_recovery_fallback_lower_speed(host);
 		} else {
 			mmc_card_set_removed(host->card);
 			if (host->card->sdr104_blocked) {
@@ -4471,6 +4488,18 @@ int mmc_detect_card_removed(struct mmc_host *host)
 	return ret;
 }
 EXPORT_SYMBOL(mmc_detect_card_removed);
+
+/*
+ * This should be called to make sure that detect work(mmc_rescan)
+ * is completed.Drivers may use this function from async schedule/probe
+ * contexts to make sure that the bootdevice detection is completed on
+ * completion of async_schedule.
+ */
+void mmc_flush_detect_work(struct mmc_host *host)
+{
+	flush_delayed_work(&host->detect);
+}
+EXPORT_SYMBOL(mmc_flush_detect_work);
 
 void mmc_rescan(struct work_struct *work)
 {

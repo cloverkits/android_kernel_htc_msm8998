@@ -10,7 +10,11 @@
  * GNU General Public License for more details.
  */
 
+<<<<<<< HEAD
 #include "sdm660-qrd.dtsi"
+=======
+#include "sdm630-qrd.dtsi"
+>>>>>>> LA.UM.6.4.r1-11500-8x98.0
 / {
 };
 
