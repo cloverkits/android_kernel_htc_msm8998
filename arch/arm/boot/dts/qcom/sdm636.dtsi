@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
-=======
 /* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
->>>>>>> LA.UM.6.4.r1-11500-8x98.0
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,8 +17,6 @@
 	compatible = "qcom,sdm636";
 	qcom,msm-id = <345 0x0>;
 
-<<<<<<< HEAD
-=======
 	reserved-memory {
 		/delete-node/ cdsp_fw_region@94a00000;
 
@@ -44,7 +38,6 @@
 			/delete-node/ port@4;
 		};
 	};
->>>>>>> LA.UM.6.4.r1-11500-8x98.0
 };
 
 &soc {
@@ -60,8 +53,6 @@
 		/delete-node/ qcom,msm_fastrpc_compute_cb12;
 		/delete-node/ qcom,msm_fastrpc_compute_cb13;
 	};
-<<<<<<< HEAD
-=======
 
 	devfreq_memlat_4: qcom,arm-memlat-mon-4 {
 		qcom,core-dev-table =
@@ -85,5 +76,4 @@
 &msm_gpu {
 		/* Update GPU chip ID*/
 		qcom,chipid = <0x05000900>;
->>>>>>> LA.UM.6.4.r1-11500-8x98.0
 };

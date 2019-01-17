@@ -15,11 +15,7 @@
 
 #include "sdm636.dtsi"
 #include "sdm636-qrd.dtsi"
-<<<<<<< HEAD
-#include "msm-pm660a.dtsi"
-=======
 #include "sdm660-internal-codec.dtsi"
->>>>>>> LA.UM.6.4.r1-11500-8x98.0
 
 / {
 	model = "Qualcomm Technologies, Inc. SDM 636 PM660 + PM660A QRD";
@@ -28,8 +24,6 @@
 	qcom,pmic-id = <0x0001001b 0x0001011a 0x0 0x0>;
 };
 
-<<<<<<< HEAD
-=======
 &int_codec {
 	qcom,model = "sdm660-snd-card-skush";
 	/delete-property/ qcom,us-euro-gpios;
@@ -57,7 +51,6 @@
 	qcom,wsa-aux-dev-prefix = "SpkrLeft", "SpkrLeft";
 };
 
->>>>>>> LA.UM.6.4.r1-11500-8x98.0
 &pm660a_oledb {
 	status = "okay";
 	qcom,oledb-default-voltage-mv = <6400>;
@@ -76,10 +69,7 @@
 	pinctrl-names = "mdss_default", "mdss_sleep";
 	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
 	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
-<<<<<<< HEAD
-=======
 	oledb-supply = <&pm660a_oledb>;
->>>>>>> LA.UM.6.4.r1-11500-8x98.0
 	lab-supply = <&lab_regulator>;
 	ibb-supply = <&ibb_regulator>;
 	qcom,platform-reset-gpio = <&tlmm 53 0>;

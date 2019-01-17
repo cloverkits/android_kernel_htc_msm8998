@@ -11,11 +11,6 @@
  */
 
 #include "sdm660-cdp.dtsi"
-<<<<<<< HEAD
-/ {
-};
-
-=======
 #include "sdm636-camera-sensor-mtp.dtsi"
 / {
 };
@@ -31,4 +26,3 @@
 &mdss_dsi1 {
 	status = "disabled";
 };
->>>>>>> LA.UM.6.4.r1-11500-8x98.0
