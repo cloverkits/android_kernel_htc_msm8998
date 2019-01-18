@@ -222,17 +222,7 @@ int _ext4_get_encryption_info(struct inode *inode)
 
 	res = ext4_init_crypto();
 	if (res)
-	    return res;
-
-retry:
-	crypt_info = ACCESS_ONCE(ei->i_crypt_info);
-	if (crypt_info) {
-		if (!crypt_info->ci_keyring_key ||
-		    key_validate(crypt_info->ci_keyring_key) == 0)
-			return 0;
-		ext4_free_encryption_info(inode, crypt_info);
-		goto retry;
-	}
+		return res;
 
 	res = ext4_xattr_get(inode, EXT4_XATTR_INDEX_ENCRYPTION,
 				 EXT4_XATTR_NAME_ENCRYPTION_CONTEXT,
@@ -364,9 +354,9 @@ got_key:
 		res = -EINVAL;
 		goto out;
 	}
+
 	if (cmpxchg(&ei->i_crypt_info, NULL, crypt_info) != NULL) {
-		ext4_free_crypt_info(crypt_info);
-		goto retry;
+		crypt_info = NULL;
 	}
 	return 0;
 

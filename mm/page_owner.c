@@ -180,6 +180,7 @@ void __set_page_owner_migrate_reason(struct page *page, int reason)
 	page_ext->last_migrate_reason = reason;
 }
 
+
 void __split_page_owner(struct page *page, unsigned int order)
 {
 	int i;
