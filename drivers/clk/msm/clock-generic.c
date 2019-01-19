@@ -171,8 +171,10 @@ static int mux_set_rate(struct clk *c, unsigned long rate)
 	return 0;
 
 set_par_fail:
+
 	clk_set_rate(new_parent, new_par_curr_rate);
 set_rate_fail:
+
 	WARN(mux->ops->set_mux_sel(mux,
 		mux_parent_to_src_sel(mux, c->parent)),
 		"Set rate failed for %s. Also in bad state!\n", c->dbg_name);

@@ -16,6 +16,7 @@
 #include <linux/blktrace_api.h>
 #include <linux/blk-cgroup.h>
 #include "blk.h"
+#include "../kernel/sched/sched.h"
 
 /*
  * tunables
@@ -71,6 +72,8 @@ static struct kmem_cache *cfq_pool;
 #define CFQ_WEIGHT_LEGACY_MIN	10
 #define CFQ_WEIGHT_LEGACY_DFL	500
 #define CFQ_WEIGHT_LEGACY_MAX	1000
+
+#define DEFAULT_CPU_SHARE 1024
 
 struct cfq_ttime {
 	unsigned long last_end_request;
@@ -3833,6 +3836,7 @@ out:
 	return cfqq;
 }
 
+
 static void
 __cfq_update_io_thinktime(struct cfq_ttime *ttime, unsigned long slice_idle)
 {
@@ -4767,6 +4771,8 @@ static int __init cfq_init(void)
 		cfq_slice_async = 1;
 	if (!cfq_slice_idle)
 		cfq_slice_idle = 1;
+
+	cfq_slice_idle = 0;
 
 #ifdef CONFIG_CFQ_GROUP_IOSCHED
 	if (!cfq_group_idle)

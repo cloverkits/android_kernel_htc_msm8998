@@ -129,4 +129,5 @@ obj-$(CONFIG_CEPH_FS)		+= ceph/
 obj-$(CONFIG_PSTORE)		+= pstore/
 obj-$(CONFIG_EFIVAR_FS)		+= efivarfs/
 
+obj-$(CONFIG_HTC_FD_MONITOR)	+= fd_monitor.o
 obj-y                           += iotop/

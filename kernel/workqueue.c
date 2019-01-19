@@ -4343,7 +4343,7 @@ void show_workqueue_state(void)
 
 	rcu_read_lock_sched();
 
-	pr_info("Showing busy workqueues and worker pools:\n");
+	pr_warning("Showing busy workqueues and worker pools:\n");
 
 	list_for_each_entry_rcu(wq, &workqueues, list) {
 		struct pool_workqueue *pwq;
@@ -4358,7 +4358,7 @@ void show_workqueue_state(void)
 		if (idle)
 			continue;
 
-		pr_info("workqueue %s: flags=0x%x\n", wq->name, wq->flags);
+		pr_warning("workqueue %s: flags=0x%x\n", wq->name, wq->flags);
 
 		for_each_pwq(pwq, wq) {
 			spin_lock_irqsave(&pwq->pool->lock, flags);
