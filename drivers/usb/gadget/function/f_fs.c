@@ -716,11 +716,15 @@ static void ffs_user_copy_worker(struct work_struct *work)
 	//ffs_log("enter: ret %d", ret);
 
 	if (io_data->read && ret > 0) {
+		mm_segment_t oldfs = get_fs();
+
+		set_fs(USER_DS);
 		use_mm(io_data->mm);
 		ret = copy_to_iter(io_data->buf, ret, &io_data->data);
 		if (ret != io_data->req->actual && iov_iter_count(&io_data->data))
 			ret = -EFAULT;
 		unuse_mm(io_data->mm);
+		set_fs(oldfs);
 	}
 
 	io_data->kiocb->ki_complete(io_data->kiocb, ret, ret);
@@ -1581,7 +1585,6 @@ ffs_fs_kill_sb(struct super_block *sb)
 	if (sb->s_fs_info) {
 		ffs_release_dev(sb->s_fs_info);
 		ffs_data_closed(sb->s_fs_info);
-		ffs_data_put(sb->s_fs_info);
 	}
 
 	//ffs_log("exit");
@@ -3174,8 +3177,8 @@ static int _ffs_func_bind(struct usb_configuration *c,
 	struct ffs_data *ffs = func->ffs;
 
 	const int full = !!func->ffs->fs_descs_count;
-	const int high = func->ffs->hs_descs_count;
-	const int super = func->ffs->ss_descs_count;
+	const int high = !!func->ffs->hs_descs_count;
+	const int super = !!func->ffs->ss_descs_count;
 
 	int fs_len, hs_len, ss_len, ret, i;
 	struct ffs_ep *eps_ptr;
@@ -3490,9 +3493,7 @@ static int ffs_func_setup(struct usb_function *f,
 	__ffs_event_add(ffs, FUNCTIONFS_SETUP);
 	spin_unlock_irqrestore(&ffs->ev.waitq.lock, flags);
 
-	//ffs_log("exit");
-
-	return 0;
+	return creq->wLength == 0 ? USB_GADGET_DELAYED_STATUS : 0;
 }
 
 static void ffs_func_suspend(struct usb_function *f)
@@ -4028,12 +4029,12 @@ static void ffs_closed(struct ffs_data *ffs)
 	if (test_bit(FFS_FL_BOUND, &ffs->flags)) {
 		unregister_gadget_item(opts->
 			       func_inst.group.cg_item.ci_parent->ci_parent);
-		//ffs_log("unreg gadget done");
+		ffs_log("unreg gadget done");
 	}
 done:
-	//ffs_log("exit");
-	return;
+	ffs_log("exit");
 }
+
 
 /* Misc helper functions ****************************************************/
 
