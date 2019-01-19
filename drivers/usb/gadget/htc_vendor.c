@@ -15,10 +15,12 @@
 struct diag_context _context;
 int vendor_com_type = 0;
 
+/*
 static struct diag_context *get_modem_ctxt(void)
 {
 	return &_context;
 }
+
 
 static int if_route_to_userspace(struct diag_context *ctxt, unsigned int cmd)
 {
@@ -42,7 +44,7 @@ static int if_route_to_userspace(struct diag_context *ctxt, unsigned int cmd)
 
 	return rc;
 }
-
+*/
 int get_vendor_request(void)
 {
 	return vendor_com_type;
