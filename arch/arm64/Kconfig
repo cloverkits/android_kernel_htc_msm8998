@@ -633,6 +633,13 @@ config SCHED_SMT
 	  MultiThreading at a cost of slightly increased overhead in some
 	  places. If unsure say N here.
 
+config HTC_POWER_DEBUG
+        bool "Support htc power debug feature"
+        help
+         Use this to enable htc power debug feature including pm statistics,
+         clock/gpio/qpnp pin dump, wakeup source, kerenl top and autosuspend
+         stage footprint
+
 config HTC_TSENS_CONTROLLER_1
 	bool "Support htc tsens controller num"
 	help

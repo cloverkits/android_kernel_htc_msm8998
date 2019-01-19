@@ -3,6 +3,9 @@
 #include <linux/utsname.h>
 #include <linux/freezer.h>
 #include <linux/compiler.h>
+#ifdef CONFIG_HTC_POWER_DEBUG
+#include <linux/notifier.h>
+#endif
 
 struct swsusp_info {
 	struct new_utsname	uts;
@@ -315,3 +318,7 @@ extern int pm_wake_lock(const char *buf);
 extern int pm_wake_unlock(const char *buf);
 
 #endif /* !CONFIG_PM_WAKELOCKS */
+
+#ifdef CONFIG_HTC_POWER_DEBUG
+extern struct blocking_notifier_head *get_pm_chain_head(void);
+#endif
